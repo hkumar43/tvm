@@ -1103,7 +1103,7 @@ class AOTExecutorCodegen : public MixedModeVisitor {
       lowered_mod = transform::RemoveStandaloneReshapes()(lowered_mod);
     }
     auto lowered_main = lowered_mod->Lookup("main");
-    auto lowered_main_func = GetRef<Function>(lowered_main.as<FunctionNode>());
+    auto lowered_main_func = Downcast<Function>(lowered_main);
 
     // Post-lowering storage map for writing main func
     AOTOnDemandAllocator final_aot_allocator;
@@ -1209,7 +1209,15 @@ class AOTExecutorCodegen : public MixedModeVisitor {
     // Parallel for loops are not supported in AoT codegen.
     lowered_mod = tir::transform::ConvertForLoopsToSerial()(lowered_mod);
 
-    bool enable_usmp = pass_ctx->GetConfig<Bool>(kUSMPEnableOption, Bool(false)).value();
+    // Check USMP option
+    bool enable_usmp = false;
+    if (runtime_config->name == kTvmRuntimeCrt) {
+      enable_usmp = true;
+    }
+    if (pass_ctx->GetConfig<Bool>(kUSMPEnableOption) != nullptr) {
+      enable_usmp = pass_ctx->GetConfig<Bool>(kUSMPEnableOption, Bool(false)).value();
+    }
+
     if (enable_usmp) {
       lowered_mod = PlanMemoryWithUSMP(lowered_mod);
     } else {
@@ -1349,6 +1357,9 @@ class AOTExecutorCodegenModule : public runtime::ModuleNode {
   }
 
   const char* type_key() const final { return "RelayGraphRuntimeCodegenModule"; }
+
+  /*! \brief Get the property of the runtime module .*/
+  int GetPropertyMask() const final { return runtime::ModulePropertyMask::kRunnable; }
 
  private:
   void init(void* mod, const Array<Target>& targets) {

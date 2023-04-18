@@ -291,11 +291,11 @@ class ControlFlowGraphBuilder final : public IRVisitorWithAnalyzer {
 
     tir::BufferLoad load;
     PrimExpr value;
-    if (auto* as_load = as_equal_node->a.as<tir::BufferLoadNode>()) {
-      load = GetRef<tir::BufferLoad>(as_load);
+    if (auto opt = as_equal_node->a.as<tir::BufferLoad>()) {
+      load = opt.value();
       value = as_equal_node->b;
-    } else if (auto* as_load = as_equal_node->b.as<tir::BufferLoadNode>()) {
-      load = GetRef<tir::BufferLoad>(as_load);
+    } else if (auto opt = as_equal_node->b.as<tir::BufferLoad>()) {
+      load = opt.value();
       value = as_equal_node->a;
     } else if (!from_assume_statement) {
       return;
@@ -1623,8 +1623,8 @@ bool ControlFlowGraph::IsOverwrittenWithoutEffect(const tir::BufferStore& store,
   }
 
   auto it = control_flow_lookup_.find(context.get());
-  ICHECK(it != control_flow_lookup_.end())
-      << "Context " << PrettyPrint(context) << " did not occur within analyzed statement";
+  ICHECK(it != control_flow_lookup_.end()) << "Context did not occur within analyzed statement:\n"
+                                           << context;
   const auto& context_block = control_flow_[it->second];
 
   auto [store_touch, free_params] = context_block.MakeBufferTouch(
